@@ -181,13 +181,13 @@ Now we're back to our original api usage
 * Implementation details
 
    Query(c context.Context, searchTerm string, opts ...QueryOption) ([]Articles, error) {
-      defaultOptions := queryConfig{
+      defaultOptions := &queryConfig{
          startDate: time.Now().UTC().AddDate(-1, 0, 0),
          endDate:   time.Now().UTC(),
          sortBy:    "dateDescending",
       }
 
-      // apply each of the options individually
+      // apply each of the options individually, if there are any, in the order the user supplies them
       for _, opt := range opts {
          if err := opt(defaultOptions); err != nil {
             return nil, err
@@ -205,6 +205,7 @@ Now we're back to our original api usage
 
       return func(qc *queryConfig) error {
          qc.startDate = date
+         return nil
       }
 
    }
@@ -224,6 +225,7 @@ Now we're back to our original api usage
 
       return func(qc *queryConfig) error {
          qc.endDate = date
+         return nil
       }
       
    }
@@ -243,6 +245,7 @@ Now we're back to our original api usage
 
       return func(qc *queryConfig) error {
          qc.sortBy = "dateDescending"
+         return nil
       }
       
    }
@@ -269,7 +272,12 @@ Now we're back to our original api usage
    )
 
    Query(c, "gophers", 
-      WithLimit(50),
+      WithLimit(50),     // limit to 50 results per page
+      WithMaxRetries(5), // retry 5 times
+      WithPage(7),       // get page 7
+      WithAuthor("Bob"), // filter to authors named Bob 
+      WithTag("Go"),     // filter to articles tagged "Go"
+      WithTagID(1234),   // filter to articles with tagID=1234
    )
 
 * Further consideration
