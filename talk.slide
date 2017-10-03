@@ -1,0 +1,303 @@
+Functional Options in Go
+Inspired by Dave Cheney
+
+
+Derek Perkins
+Nozzle
+https://nozzle.io
+@derek_perkins
+derek@derekperkins.com
+
+* Let's build an api to query NYTimes articles
+
+_Derived_from_
+.link http://gtkesh.com/functional-options-for-friendly-apis-nyt-articles-api-wrapper/
+
+You start with the simplest api
+
+   Query(c context.Context, searchTerm string) ([]Articles, error) {
+      // build a url 
+      // make a request to NYT API
+      // handle response
+      // return articles
+   }
+
+* BREAKING CHANGE: Filter by beginning date
+
+Then someone wants to filter by the date
+
+   Query(c context.Context, searchTerm string, startDate time.Time) ([]Articles, error) {
+      // build a url 
+      // make a request to NYT API
+      // handle response
+      // return articles
+   }
+
+* BREAKING CHANGE: Filter by beginning date but default to 1 year ago
+
+Then someone wants to filter by the date, so you either
+
+- allow for nil startDate
+
+- check for startDate.IsZero(), which isn't obvious
+
+   Query(c context.Context, searchTerm string, startDate *time.Time) ([]Articles, error) {
+      if startDate == nil {
+         startDate = &time.Now().UTC().AddDate(-1, 0, 0)
+      }
+
+      // build a url 
+      // make a request to NYT API
+      // handle response
+      // return articles
+   }
+
+* BREAKING CHANGE: Filter by end date
+
+Then someone wants to filter by the date
+
+   Query(c context.Context, searchTerm string, startDate, endDate *time.Time) ([]Articles, error) {
+      if startDate == nil {
+         startDate = &time.Now().UTC().AddDate(-1, 0, 0)
+      }
+
+      if endDate == nil {
+         endDate = &time.Now().UTC()
+      }
+
+      // build a url 
+      // make a request to NYT API
+      // handle response
+      // return articles
+   }
+
+* BREAKING CHANGE: Add sorting
+
+Now people are asking to change the sorting options
+
+   Query(c context.Context, searchTerm string, startDate, endDate *time.Time, sortBy string) ([]Articles, error) {
+      if startDate == nil {
+         startDate = &time.Now().UTC().AddDate(-1, 0, 0)
+      }
+
+      if endDate == nil {
+         endDate = &time.Now().UTC()
+      }
+
+      switch sortBy {
+         ...
+      }
+
+      // build a url 
+      // make a request to NYT API
+      // handle response
+      // return articles
+   }
+
+* How can you define an api for a constantly moving target?
+
+* First thought, use specialized functions, ala Server
+
+   QueryByStartDate(c context.Context, searchTerm string, startDate *time.Time) ([]Articles, error)
+
+   QueryByStartDateAndEndDate(c context.Context, searchTerm string, startDate, endDate *time.Time) ([]Articles, error)
+
+   QueryByStartDateAndEndDateAndSort(c context.Context, searchTerm string, startDate, endDate *time.Time, sortBy string) ([]Articles, error)
+
+   ...
+
+The number of functions multiplies exponentially by the number of config options
+
+
+* That didn't work, let's use a config struct
+
+   type QueryConfig struct {
+      StartDate  *time.Time
+      EndDate    *time.Time
+      SortBy     string
+   }
+
+    Query(c context.Context, searchTerm string, qc *QueryConfig) ([]Articles, error) {
+      if qc.StartDate == nil {
+         qc.StartDate = &time.Now().UTC().AddDate(-1, 0, 0)
+      }
+
+      if qc.EndDate == nil {
+         qc.EndDate = &time.Now().UTC()
+      }
+
+      ...
+   }
+
+* Config struct usage 
+
+   Query(c, "gophers", &QueryConfig{
+      StartDate: &time.Now().UTC().AddDate(-1, 0, 0),
+      StartDate: &time.Now().UTC(),
+      SortBy: "dateDescending",
+   })
+
+
+* Config 
+
+*Pros:*
+
+- Adding a new field isn't always a breaking change
+
+- Docs are clearer, since each field can be commented individually
+
+*Cons:*
+
+- Adding a new field will break anyone expecting struct ordering (_idiots_)
+
+- You can't always overwrite the zero value with the default
+
+- Not obvious when default values are being used
+
+- All configurable fields have to be public
+
+
+
+* Functional options to the rescue!
+
+We'll actually still use a config struct, which you can choose to make public or private
+
+   type QueryOption func(qc *queryConfig) error
+
+   type queryConfig struct {
+      startDate  time.Time
+      endDate    time.Time
+      sortBy     string
+   }
+
+The function signature should include required fields like `searchTerm`, and everything else is an option
+
+   Query(c context.Context, searchTerm string, opts ...QueryOption) ([]Articles, error)
+
+Now we're back to our original api usage
+
+   Query(c, "gophers")
+
+* Implementation details
+
+   Query(c context.Context, searchTerm string, opts ...QueryOption) ([]Articles, error) {
+      defaultOptions := queryConfig{
+         startDate: time.Now().UTC().AddDate(-1, 0, 0),
+         endDate:   time.Now().UTC(),
+         sortBy:    "dateDescending",
+      }
+
+      // apply each of the options individually
+      for _, opt := range opts {
+         if err := opt(defaultOptions); err != nil {
+            return nil, err
+         }
+      }
+      ...
+   }
+
+* Filter by beginning date (Non-breaking change)
+
+   // WithStartDate restricts responses to results with publication dates
+   // of the date specified or later.
+
+   func WithStartDate(date time.Time) QueryOption {  
+
+      return func(qc *queryConfig) error {
+         qc.startDate = date
+      }
+
+   }
+
+*Usage*
+
+   Query(c, "gophers",
+      WithStartDate(time.Now().UTC().AddDate(-1, 0, 0)),
+   )
+
+* Filter by end date (Non-breaking change)
+
+   // WithEndDate restricts responses to results with publication dates
+   // of the date specified or earlier.
+
+   func WithEndDate(date time.Time) QueryOption {  
+
+      return func(qc *queryConfig) error {
+         qc.endDate = date
+      }
+      
+   }
+
+
+*Usage*
+
+   Query(c, "gophers",
+      WithEndDate(time.Now().UTC()),
+   )
+
+* Add sorting (Non-breaking change)
+
+   // SortedByNewest sorts by the publish date descending
+
+   func SortedByNewest() QueryOption {  
+
+      return func(qc *queryConfig) error {
+         qc.sortBy = "dateDescending"
+      }
+      
+   }
+
+*Usage*
+
+   Query(c, "gophers",
+      SortedByNewest(),
+   )
+
+* Unlimited combinations
+
+*Usage*
+
+   Query(c, "gophers", 
+      WithStartDate(time.Now().UTC().AddDate(-1, 0, 0)),
+      SortedByNewest(),
+   )
+
+   Query(c, "gophers", 
+      WithStartDate(time.Now().UTC().AddDate(-1, 0, 0)),
+      WithEndDate(time.Now().UTC(),
+      SortedByNewest(),
+   )
+
+   Query(c, "gophers", 
+      WithLimit(50),
+   )
+
+* Further consideration
+
+- If you have incompatible options, error out
+
+- The last options take precedence if there is conflict, but that should generally be obvious to the user
+
+- You could also have the search term be an option to make this also work as a list call
+
+- If you make the config public, users can write their own funcs
+
+- 
+
+
+* Inspiration and further reading
+
+Example inspired by Giorgi Tkeshelashvili (and hopefully improved on)
+
+.link http://gtkesh.com/functional-options-for-friendly-apis-nyt-articles-api-wrapper/
+
+functional options popularized by Dave Cheney
+
+.link https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis
+
+.link https://www.youtube.com/watch?v=24lFtGHWxAQ
+
+originally suggested by the Commander himself
+
+.link https://commandcenter.blogspot.com.au/2014/01/self-referential-functions-and-design.html
+
