@@ -22,6 +22,10 @@ You start with the simplest api
       // return articles
    }
 
+*Usage*
+
+  Query(c, "gophers")
+
 * BREAKING CHANGE: Filter by beginning date
 
 Then someone wants to filter by the date
@@ -32,6 +36,10 @@ Then someone wants to filter by the date
       // handle response
       // return articles
    }
+
+*Usage*
+
+  Query(c, "gophers", time.Now().UTC().AddDate(-1, 0, 0))
 
 * BREAKING CHANGE: Filter by beginning date but default to 1 year ago
 
@@ -52,6 +60,10 @@ Then someone wants to filter by the date, so you either
       // return articles
    }
 
+*Usage*
+
+  Query(c, "gophers", nil)
+
 * BREAKING CHANGE: Filter by end date
 
 Then someone wants to filter by the date
@@ -71,6 +83,10 @@ Then someone wants to filter by the date
       // return articles
    }
 
+*Usage*
+
+  Query(c, "gophers", time.Now().UTC().AddDate(-1, 0, 0), time.Now().UTC())
+
 * BREAKING CHANGE: Add sorting
 
 Now people are asking to change the sorting options
@@ -87,12 +103,12 @@ Now people are asking to change the sorting options
       switch sortBy {
          ...
       }
-
-      // build a url 
-      // make a request to NYT API
-      // handle response
-      // return articles
+      ...
    }
+
+*Usage*
+
+  Query(c, "gophers", time.Now().UTC().AddDate(-1, 0, 0), time.Now().UTC(), "dateDescending")
 
 * How can you define an api for a constantly moving target?
 
@@ -122,14 +138,10 @@ The number of functions multiplies exponentially by the number of config options
          qc.StartDate = &time.Now().UTC().AddDate(-1, 0, 0)
       }
 
-      if qc.EndDate == nil {
-         qc.EndDate = &time.Now().UTC()
-      }
-
       ...
    }
 
-* Config struct usage 
+*Usage*
 
    Query(c, "gophers", &QueryConfig{
       StartDate: &time.Now().UTC().AddDate(-1, 0, 0),
@@ -156,6 +168,8 @@ The number of functions multiplies exponentially by the number of config options
 
 - All configurable fields have to be public
 
+- Query func bloats with each additional option
+
 
 
 * Functional options to the rescue!
@@ -180,6 +194,8 @@ Now we're back to our original api usage
 
 * Implementation details
 
+It's super easy to see what the defaults are
+
    Query(c context.Context, searchTerm string, opts ...QueryOption) ([]Articles, error) {
       defaultOptions := &queryConfig{
          startDate: time.Now().UTC().AddDate(-1, 0, 0),
@@ -187,12 +203,17 @@ Now we're back to our original api usage
          sortBy:    "dateDescending",
       }
 
-      // apply each of the options individually, if there are any, in the order the user supplies them
+      // apply each of the options individually in the order the user supplies them
       for _, opt := range opts {
+
+         // each option func gets the queryConfig and can mutate it as needed
          if err := opt(defaultOptions); err != nil {
             return nil, err
          }
       }
+
+      // make sure that there aren't invalid combinations (e.g. startDate after endDate)
+      err := defaultOptions.validate()
       ...
    }
 
@@ -256,6 +277,28 @@ Now we're back to our original api usage
       SortedByNewest(),
    )
 
+* Add limit (Non-breaking change)
+
+   // WithLimit limits the results returned
+
+   func WithLimit(limit int) QueryOption {  
+
+      return func(qc *queryConfig) error {
+         if limit < 0 {
+            return errors.New("limit must be greater than 0")
+         }
+         qc.limit = limit
+         return nil
+      }
+      
+   }
+
+*Usage*
+
+   Query(c, "gophers",
+      WithLimit(10),
+   )
+
 * Unlimited combinations
 
 *Usage*
@@ -272,12 +315,12 @@ Now we're back to our original api usage
    )
 
    Query(c, "gophers", 
-      WithLimit(50),     // limit to 50 results per page
       WithMaxRetries(5), // retry 5 times
       WithPage(7),       // get page 7
       WithAuthor("Bob"), // filter to authors named Bob 
       WithTag("Go"),     // filter to articles tagged "Go"
       WithTagID(1234),   // filter to articles with tagID=1234
+      BypassCache(),     // don't accept cached results
    )
 
 * Further consideration
@@ -290,7 +333,7 @@ Now we're back to our original api usage
 
 - If you make the config public, users can write their own funcs
 
-- 
+- We are migrating most of our internal apis to use functional options, currently > 12 services use it
 
 
 * Inspiration and further reading
