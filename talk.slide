@@ -116,13 +116,23 @@ Now people are asking to change the sorting options
 
    QueryByStartDate(c context.Context, searchTerm string, startDate *time.Time) ([]Articles, error)
 
+   QueryByEndDate(c context.Context, searchTerm string, endDate *time.Time) ([]Articles, error)
+
+   QueryAndSort(c context.Context, searchTerm string, sortBy string) ([]Articles, error)
+
    QueryByStartDateAndEndDate(c context.Context, searchTerm string, startDate, endDate *time.Time) ([]Articles, error)
+
+   QueryByStartDateAndSort(c context.Context, searchTerm string, startDate *time.Time, sortBy string) ([]Articles, error)
+
+   QueryByEndDateAndSort(c context.Context, searchTerm string, endDate *time.Time, sortBy string) ([]Articles, error)
 
    QueryByStartDateAndEndDateAndSort(c context.Context, searchTerm string, startDate, endDate *time.Time, sortBy string) ([]Articles, error)
 
    ...
 
 The number of functions multiplies exponentially by the number of config options
+
+\...but at least we're not breaking any users
 
 
 * That didn't work, let's use a config struct
@@ -321,6 +331,7 @@ It's super easy to see what the defaults are
       WithTag("Go"),     // filter to articles tagged "Go"
       WithTagID(1234),   // filter to articles with tagID=1234
       BypassCache(),     // don't accept cached results
+      WithClient(cl),    // make the request using a custom http client
    )
 
 * Further consideration
