@@ -43,7 +43,7 @@ Then someone wants to filter by the date
 
 * BREAKING CHANGE: Filter by beginning date but default to 1 year ago
 
-Then someone wants to filter by the date, so you either
+How do you know when to use defaults vs user provided values?
 
 - allow for nil startDate
 
@@ -112,7 +112,7 @@ Now people are asking to change the sorting options
 
 * How can you define an api for a constantly moving target?
 
-* First thought, use specialized functions, ala Server
+* First thought, use specialized functions, à la Server
 
    QueryByStartDate(c context.Context, searchTerm string, startDate *time.Time) ([]Articles, error)
 
