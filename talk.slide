@@ -346,6 +346,27 @@ It's super easy to see what the defaults are
 
 - We are migrating most of our internal apis to use functional options, currently > 12 services use it
 
+* Who is actively using functional options?
+
+*gRPC*
+
+  type DialOption func(*dialOptions)
+    func WithAuthority(a string) DialOption
+    func WithStatsHandler(h stats.Handler) DialOption
+
+  type ServerOption func(*options)
+    func Creds(c credentials.TransportCredentials) ServerOption
+    func StreamInterceptor(i StreamServerInterceptor) ServerOption
+
+.link https://godoc.org/google.golang.org/grpc
+
+*golang.org/x/text/cases*
+
+  type Option func(o options) options
+    func HandleFinalSigma(enable bool) Option
+    NoLower Option = noLower
+
+.link https://godoc.org/golang.org/x/text/cases
 
 * Inspiration and further reading
 
