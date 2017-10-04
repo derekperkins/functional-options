@@ -370,7 +370,10 @@ It's super easy to see what the defaults are
 
 * Inspiration and further reading
 
-Example inspired by Giorgi Tkeshelashvili (and hopefully improved on)
+slides can be found at
+.link http://talks.godoc.org/github.com/derekperkins/functional-options/talk.slide
+
+example inspired by Giorgi Tkeshelashvili
 
 .link http://gtkesh.com/functional-options-for-friendly-apis-nyt-articles-api-wrapper/
 
