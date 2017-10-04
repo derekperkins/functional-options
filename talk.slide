@@ -346,6 +346,22 @@ It's super easy to see what the defaults are
 
 - We are migrating most of our internal apis to use functional options, currently > 12 services use it
 
+* Comparison to the builder pattern
+
+In many ways, this is similar to the builder pattern, where each option returns the original object, allowing for chained options
+
+   NewQuery("gophers"). 
+      WithStartDate(time.Now().UTC().AddDate(-1, 0, 0)).
+      SortedByNewest().
+      Do(c)
+
+This has a few distinct differences:
+
+- To chain, options have to return the query and can't error on invalid values
+
+- The original object can be edited at any point, which is sometimes necessary, but opens up the possibility of race conditions
+
+
 * Who is actively using functional options?
 
 *gRPC*
